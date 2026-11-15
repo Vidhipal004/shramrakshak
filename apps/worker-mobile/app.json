@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "ShramRakshak",
+    "slug": "shramrakshak-worker",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "shramrakshak",
+    "ios": { "supportsTablet": false },
+    "android": { "package": "in.shramrakshak.worker", "adaptiveIcon": { "backgroundColor": "#f4f3ec" } },
+    "plugins": [
+      ["expo-image-picker", { "photosPermission": "ShramRakshak uses your offer photo to read job terms for your review." }],
+      ["expo-secure-store", { "configureAndroidBackup": true }]
+    ],
+    "extra": { "apiUrl": "http://127.0.0.1:8000" }
+  }
+}

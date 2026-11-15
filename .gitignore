@@ -1,0 +1,26 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+*.db
+node_modules/
+dist/
+.expo/
+.pytest_cache/
+.DS_Store
+*.tsbuildinfo
+
+# Environment files
+.env.*
+!.env.example
+
+# Build and test output
+coverage/
+build/
+.expo-shared/
+
+# SQLite databases
+*.sqlite
+*.sqlite3
+*.sqlite-*
