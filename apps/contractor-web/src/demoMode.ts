@@ -1,5 +1,13 @@
-export function canUseDemo(isDevelopmentBuild: boolean): boolean {
-  return isDevelopmentBuild
+const demoSessionKey = 'sr_contractor_demo_guest_v1'
+
+export function canUseDemo(_isDevelopmentBuild?: boolean): boolean {
+  return true
+}
+
+export const demoSession = {
+  start(): void { sessionStorage.setItem(demoSessionKey, '1') },
+  active(): boolean { return sessionStorage.getItem(demoSessionKey) === '1' },
+  clear(): void { sessionStorage.removeItem(demoSessionKey) },
 }
 
 /** Prevent workspace code from reaching the live API while demo mode is active. */

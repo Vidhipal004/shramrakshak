@@ -3,9 +3,9 @@ import test from 'node:test'
 import { assertLiveApiAllowed, canUseDemo } from '../src/demoMode.ts'
 import { createDemoSnapshot, demoAttendance } from '../src/demoData.ts'
 
-test('demo admin entry is allowed only for development builds', () => {
+test('demo guest entry is available in development and production builds', () => {
   assert.equal(canUseDemo(true), true)
-  assert.equal(canUseDemo(false), false)
+  assert.equal(canUseDemo(false), true)
 })
 
 test('demo dataset is isolated and cannot authenticate as a production admin', () => {

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { api, json, tokenStore, type Agreement, type AgreementVersion, type Application, type Complaint, type Job, type Profile, type Travel } from './api'
 import { copy, type Language } from './i18n'
-import { assertLiveApiAllowed, canUseDemo } from './demoMode'
+import { assertLiveApiAllowed, canUseDemo, demoSession } from './demoMode'
 import { createDemoWorkspace, demoApplications, demoAttendance, demoPayments } from './demoData'
 
 type Page = 'overview' | 'jobs' | 'applicants' | 'agreements' | 'travel' | 'complaints' | 'profile'
@@ -26,7 +26,7 @@ function App() {
   const [page, setPage] = useState<Page>('overview')
   const [selectedApplicantJob, setSelectedApplicantJob] = useState('all')
   const [profile, setProfile] = useState<Profile | null>(null)
-  const [demoMode, setDemoMode] = useState(false)
+  const [demoMode, setDemoMode] = useState(() => demoSession.active())
   const [authMode, setAuthMode] = useState<AuthMode>('login')
   const [busy, setBusy] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -73,7 +73,11 @@ function App() {
     finally { setLoading(false) }
   }, [demoMode, workspaceRequest])
 
-  useEffect(() => { if (!demoMode && tokenStore.get()) void loadWorkspace(); else if (!demoMode) setLoading(false) }, [demoMode, loadWorkspace])
+  useEffect(() => {
+    if (demoMode) { tokenStore.clear(); void loadWorkspace() }
+    else if (tokenStore.get()) void loadWorkspace()
+    else setLoading(false)
+  }, [demoMode, loadWorkspace])
 
   useEffect(() => {
     if (page !== 'applicants' || demoMode) return
@@ -115,8 +119,8 @@ function App() {
   }
 
   function startDemo() {
-    if (!canUseDemo(import.meta.env.DEV)) return
     tokenStore.clear()
+    demoSession.start()
     const sample = createDemoWorkspace()
     setDemoMode(true); setLoading(false); setPage('overview'); setProfile(sample.profile)
     setProfileDraft({ full_name: sample.profile.full_name, business_name: sample.profile.business_name || '', phone: sample.profile.phone || '', city: sample.profile.city || '', state: sample.profile.state || '' })
@@ -237,13 +241,13 @@ function App() {
   }
 
   async function signOut() {
-    if (demoMode) { setDemoMode(false); setProfile(null); setJobs([]); setAgreements([]); setComplaints([]); setApplications({}); setTravelChecks([]); setTrustReport(null); setPage('overview'); setSuccess(''); setLoading(false); return }
+    if (demoMode) { demoSession.clear(); setDemoMode(false); setProfile(null); setJobs([]); setAgreements([]); setComplaints([]); setApplications({}); setTravelChecks([]); setTrustReport(null); setPage('overview'); setSuccess(''); setLoading(false); return }
     try { await api('/api/v1/auth/logout', { method: 'POST' }) } catch { /* clear the local session even if the server cannot be reached */ }
     tokenStore.clear(); setProfile(null); setJobs([]); setAgreements([]); setComplaints([]); setPage('overview')
   }
 
   if (loading) return <div className="loading-page"><span className="brand-mark">S</span><p>{t.loading}</p></div>
-  if (!profile) return <AuthScreen t={t} language={language} setLanguage={setLanguage} mode={authMode} setMode={setAuthMode} fields={authFields} setFields={setAuthFields} onSubmit={submitAuth} onDemo={startDemo} demoAllowed={canUseDemo(import.meta.env.DEV)} busy={busy} error={error} success={success} />
+  if (!profile) return <AuthScreen t={t} language={language} setLanguage={setLanguage} mode={authMode} setMode={setAuthMode} fields={authFields} setFields={setAuthFields} onSubmit={submitAuth} onDemo={startDemo} demoAllowed={canUseDemo()} busy={busy} error={error} success={success} />
 
   return (
     <div className="app-shell">
@@ -261,7 +265,7 @@ function App() {
       <main className="main-area">
         <header className="topbar"><div className="breadcrumbs"><span>Workspace</span><ArrowRight size={13} /><strong>{page === 'profile' ? t.navProfile : t[nav.find(item => item.id === page)?.label || 'navOverview']}</strong></div><div className="top-actions"><button className="quiet-button language-toggle" onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}><Languages size={16} />{t.language}</button><button className="icon-button notification-button" aria-label="Refresh workspace" onClick={() => demoMode ? setMessage(language === 'en' ? 'Demo data is local; no server was contacted.' : 'डेमो डेटा स्थानीय है; सर्वर से संपर्क नहीं हुआ।') : void loadWorkspace()}><RefreshCw size={17} /></button><button className="mobile-profile" onClick={() => setPage('profile')}>{profile.full_name.slice(0, 1).toUpperCase()}</button></div></header>
         <div className="page-content">
-          {demoMode && <div className="demo-banner" role="status"><ShieldCheck size={17} /><strong>{language === 'en' ? 'DEMO CONTRACTOR · SAMPLE DATA ONLY' : 'डेमो ठेकेदार · केवल नमूना डेटा'}</strong><span>{language === 'en' ? 'Changes stay in this browser and are not real.' : 'बदलाव इसी ब्राउज़र में रहेंगे और वास्तविक नहीं हैं।'}</span></div>}
+          {demoMode && <div className="demo-banner" role="status"><ShieldCheck size={17} /><strong>DEMO MODE — SAMPLE DATA ONLY</strong><span>{language === 'en' ? 'Displayed records are samples. Local demo edits do not reach workers or production systems.' : 'दिखाए गए रिकॉर्ड नमूने हैं। स्थानीय डेमो बदलाव कर्मचारियों या उत्पादन सिस्टम तक नहीं जाते।'}</span></div>}
           {error && <div className="alert error-alert"><span>{error}</span><button onClick={() => setError('')}><X size={16} /></button></div>}
           {success && <div className="alert success-alert"><CheckCircle2 size={17} /><span>{success}</span></div>}
           {page === 'overview' && <Overview t={t} profile={profile} activeJobs={activeJobs.length} applicants={Object.values(applications).flat().filter(app => app.status === 'pending').length} openCases={pendingComplaints.length} agreements={agreements.length} trustReport={trustReport} onTrust={showTrust} onNavigate={setPage} />}
@@ -281,7 +285,7 @@ function App() {
 }
 
 function AuthScreen({ t, language, setLanguage, mode, setMode, fields, setFields, onSubmit, onDemo, demoAllowed, busy, error, success }: any) {
-  return <div className="auth-page"><div className="auth-brand"><span className="brand-mark">S</span><span>{t.product}<small>{t.role}</small></span><button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}>{t.language}</button></div><div className="auth-card"><div className="eyebrow">TRUST BEGINS WITH CLEAR TERMS</div><h1>{mode === 'login' ? t.signIn : t.register}</h1><p>Manage listings, applications and accepted wage agreements from one workspace.</p>{error && <div className="alert error-alert">{error}</div>}{success && <div className="alert success-alert">{success}</div>}<form className="stack-form" onSubmit={onSubmit}>{mode === 'register' && <><label>{t.name}<input required autoComplete="name" value={fields.full_name} onChange={(e: any) => setFields({ ...fields, full_name: e.target.value })} /></label><label>{t.business}<input required value={fields.business_name} onChange={(e: any) => setFields({ ...fields, business_name: e.target.value })} /></label></>}<label>{t.email}<input type="email" required autoComplete="email" value={fields.email} onChange={(e: any) => setFields({ ...fields, email: e.target.value })} /></label><label>{t.password}<input type="password" required minLength={8} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={fields.password} onChange={(e: any) => setFields({ ...fields, password: e.target.value })} /></label><button className="primary-button full-width" disabled={busy}>{busy ? 'Please wait…' : t.continue}<ArrowRight size={16} /></button></form>{mode === 'login' && demoAllowed && <button className="demo-button full-width" type="button" onClick={onDemo}>{language === 'en' ? 'Continue as Demo Contractor · DEVELOPMENT ONLY' : 'डेमो ठेकेदार के रूप में जारी रखें · केवल विकास के लिए'}<ArrowRight size={16} /></button>}<button className="auth-switch" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'New to ShramRakshak? Create a contractor account' : 'Already registered? Sign in'}</button><div className="auth-note"><ShieldCheck size={16} />Account creation is protected by Supabase Auth.</div></div><footer>Clear work. Fair wages. Reliable records.</footer></div>
+  return <div className="auth-page"><div className="auth-brand"><span className="brand-mark">S</span><span>{t.product}<small>{t.role}</small></span><button onClick={() => setLanguage(language === 'en' ? 'hi' : 'en')}>{t.language}</button></div><div className="auth-card"><div className="eyebrow">TRUST BEGINS WITH CLEAR TERMS</div><h1>{mode === 'login' ? (language === 'en' ? 'Contractor Sign In (optional real authentication)' : t.signIn) : t.register}</h1><p>Manage listings, applications and accepted wage agreements from one workspace.</p>{error && <div className="alert error-alert">{error}</div>}{success && <div className="alert success-alert">{success}</div>}<form className="stack-form" onSubmit={onSubmit}>{mode === 'register' && <><label>{t.name}<input required autoComplete="name" value={fields.full_name} onChange={(e: any) => setFields({ ...fields, full_name: e.target.value })} /></label><label>{t.business}<input required value={fields.business_name} onChange={(e: any) => setFields({ ...fields, business_name: e.target.value })} /></label></>}<label>{t.email}<input type="email" required autoComplete="email" value={fields.email} onChange={(e: any) => setFields({ ...fields, email: e.target.value })} /></label><label>{t.password}<input type="password" required minLength={8} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={fields.password} onChange={(e: any) => setFields({ ...fields, password: e.target.value })} /></label><button className="primary-button full-width" disabled={busy}>{busy ? 'Please wait…' : t.continue}<ArrowRight size={16} /></button></form>{mode === 'login' && demoAllowed && <button className="demo-button full-width" type="button" onClick={onDemo}>{language === 'en' ? 'Continue as Demo Guest' : 'डेमो अतिथि के रूप में जारी रखें'}<ArrowRight size={16} /></button>}<button className="auth-switch" onClick={() => setMode(mode === 'login' ? 'register' : 'login')}>{mode === 'login' ? 'New to ShramRakshak? Create a contractor account' : 'Already registered? Sign in'}</button><div className="auth-note"><ShieldCheck size={16} />Account creation is protected by Supabase Auth.</div></div><footer>Clear work. Fair wages. Reliable records.</footer></div>
 }
 
 function DemoRecords({ language }: { language: Language }) {

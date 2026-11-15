@@ -3,9 +3,9 @@ import test from 'node:test'
 import { assertLiveApiAllowed, canUseDemo } from '../src/demoMode.ts'
 import { createDemoWorkspace, demoAttendance, demoPayments } from '../src/demoData.ts'
 
-test('demo entry is enabled only for a development build', () => {
+test('demo guest entry is available in development and production builds', () => {
   assert.equal(canUseDemo(true), true)
-  assert.equal(canUseDemo(false), false)
+  assert.equal(canUseDemo(false), true)
 })
 
 test('fixture is a contractor identity with isolated sample records', () => {
